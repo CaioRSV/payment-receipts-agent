@@ -12,4 +12,9 @@ uvicorn app.main:app --reload
 ## Routes
 
 - `GET /health` - health check
+- `POST /chat` - chatbot entrypoint with receipt intent detection
 - `POST /receipts` - trigger receipt generation
+
+## Knowledge Base
+
+- Edit [knowledge.md](knowledge.md) to change the chatbot fallback context and trigger examples.

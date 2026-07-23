@@ -14,7 +14,15 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from app.services.receipts import ReceiptGenerationResult, generate_receipts
+from app.services.receipts import (
+    ReceiptGenerationResult,
+    generate_receipts,
+    MONTH_ALIASES,
+    normalize_text as _normalize_text,
+    tokens as _tokens,
+    contains_term as _contains_term,
+    resolve_month as _resolve_month,
+)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 KNOWLEDGE_FILE = ROOT_DIR / "knowledge.md"
@@ -23,20 +31,6 @@ logger = logging.getLogger(__name__)
 GENERATION_TERMS = {"gere", "gerar", "generate", "crie", "criar", "emit", "emitir"}
 RECEIPT_TERMS = {"recibo", "receipt"}
 GENERIC_MONTH_TERMS = {"mes", "month"}
-MONTH_ALIASES = {
-    "JANUARY": {"january", "janeiro", "jan", "januari", "janury"},
-    "FEBRUARY": {"february", "fevereiro", "fev", "feb", "febraury", "fevereiro"},
-    "MARCH": {"march", "marco", "mar", "mrach"},
-    "APRIL": {"april", "abril", "apr", "aprl"},
-    "MAY": {"may", "maio"},
-    "JUNE": {"june", "junho", "jun"},
-    "JULY": {"july", "julho", "jul"},
-    "AUGUST": {"august", "agosto", "aug", "agost"},
-    "SEPTEMBER": {"september", "setembro", "sep", "sept", "setenbro"},
-    "OCTOBER": {"october", "outubro", "oct", "out", "octuber"},
-    "NOVEMBER": {"november", "novembro", "nov", "novenber"},
-    "DECEMBER": {"december", "dezembro", "dec", "dez", "decenber"},
-}
 
 
 class ChatRequest(BaseModel):
@@ -47,32 +41,6 @@ class ChatResponse(BaseModel):
     mode: str
     reply: str
     receipt: ReceiptGenerationResult | None = None
-
-
-def _normalize_text(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    stripped = "".join(character for character in normalized if not unicodedata.combining(character))
-    return re.sub(r"\s+", " ", stripped.lower()).strip()
-
-
-def _tokens(normalized_text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", normalized_text)
-
-
-def _contains_term(tokens: list[str], terms: set[str], cutoff: float = 0.84) -> bool:
-    for token in tokens:
-        if token in terms:
-            return True
-        if get_close_matches(token, list(terms), n=1, cutoff=cutoff):
-            return True
-    return False
-
-
-def _resolve_month(tokens: list[str]) -> str | None:
-    for month_name, aliases in MONTH_ALIASES.items():
-        if _contains_term(tokens, aliases, cutoff=0.82):
-            return month_name
-    return None
 
 
 def _detect_receipt_intent(message: str) -> tuple[bool, str, str]:

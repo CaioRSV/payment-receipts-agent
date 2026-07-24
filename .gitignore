@@ -139,3 +139,8 @@ venv.bak/
 *.njsproj
 *.sln
 *.sw?
+
+# Database files
+*.db
+*.db-journal
+

@@ -11,6 +11,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pathlib import Path
+from jinja2 import Template
+from html2image import Html2Image
+from PIL import Image
+from app.services.database import get_db_config
 
 
 MONTH_NAMES = {
@@ -100,7 +105,11 @@ class DirectReceiptRequest(BaseModel):
     payment_month: int | str
     payment_year: int | str
     referred_month: int | str
+    signer_name: str | None = None
+    signer_address: str | None = None
+    location: str | None = None
     pt_br: bool = True
+    body_text: str | None = None
 
 
 class DirectReceiptResponse(BaseModel):
@@ -108,6 +117,7 @@ class DirectReceiptResponse(BaseModel):
     payment_date: date
     referred_month: str
     formatted_message: str
+    image_path: str | None = None
     trigger_info: dict[str, object]
 
 
@@ -289,6 +299,205 @@ def format_receipt_message(payment_date: date, referred_month_str: str, pt_br: b
         return f"Payment receipt: payment made on {formatted_date} referred to the month of {en_month} {referred_year}."
 
 
+RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #ffffff;
+    width: 1650px;
+    height: 1600px;
+    overflow: hidden;
+  }
+  .receipt-container {
+    width: 1650px;
+    height: 1600px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: 'Segoe UI Black', 'Segoe UI', sans-serif;
+  }
+  .thick-bar {
+    height: 24px;
+    background-color: #03008D;
+  }
+  .thin-bar {
+    height: 6px;
+    background-color: #03008D;
+  }
+  .top-bar .thin-bar {
+    margin-top: 6px;
+  }
+  .bottom-bar .thin-bar {
+    margin-bottom: 6px;
+  }
+  .receipt-content {
+    padding: 80px 180px 100px 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-grow: 1;
+  }
+  h1 {
+    font-size: 68px;
+    color: #000000;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 6px;
+    margin: 0 0 70px 0;
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+  .body-text {
+    font-size: 44px;
+    line-height: 1.6;
+    text-align: justify;
+    color: #2b2b2b;
+    margin: 0 0 100px 0;
+  }
+  .signature-container {
+    text-align: center;
+  }
+  .date-line {
+    font-size: 38px;
+    color: #03008D;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0 0 40px 0;
+  }
+  .signature-img {
+    width: 1080px;
+    height: 250px;
+    display: block;
+    margin: 0 auto 20px auto;
+  }
+  .signer-name {
+    font-size: 40px;
+    color: #000000;
+    margin: 0;
+  }
+  .signer-address {
+    font-size: 28px;
+    color: #666666;
+    margin: 10px 0 0 0;
+  }
+</style>
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="top-bar">
+      <div class="thick-bar"></div>
+      <div class="thin-bar"></div>
+    </div>
+    <div class="receipt-content">
+      <h1>Recibo</h1>
+      <p class="body-text">
+        {{ body_text }}
+      </p>
+      <div class="signature-container">
+        <p class="date-line">{{ location_date_line }}</p>
+        <img class="signature-img" src="{{ signature_image_url }}" alt="Signature">
+        <p class="signer-name">{{ signer_name }}</p>
+        <p class="signer-address">{{ signer_address }}</p>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <div class="thin-bar"></div>
+      <div class="thick-bar"></div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def ensure_signature_image() -> None:
+    path = Path("signature.png")
+    if not path.exists():
+        img = Image.new("RGBA", (1080, 250), (0, 0, 0, 0))
+        img.save(path)
+
+
+def format_receipt_html(
+    payment_date: date,
+    referred_month_str: str,
+    signer_name: str,
+    signer_address: str,
+    location: str,
+    pt_br: bool,
+    body_text: str
+) -> str:
+    """Renders the HTML template for the receipt.
+
+    Args:
+        payment_date: The date of payment.
+        referred_month_str: The referred month (e.g. 'JANUARY.2024').
+        signer_name: Name of the receipt signer.
+        signer_address: Address of the receipt signer.
+        location: Signed location.
+        pt_br: True if language is pt-br, False for english.
+        body_text: The receipt body text template. Must contain the placeholder '{ref_month}'.
+
+    Raises:
+        ValueError: If 'body_text' does not contain the placeholder '{ref_month}'.
+    """
+    if "{ref_month}" not in body_text:
+        raise ValueError("O texto do corpo (body_text) deve conter a tag '{ref_month}' para substituição.")
+
+    month_name, _, referred_year = referred_month_str.partition(".")
+    
+    if pt_br:
+        pt_months = {
+            "JANUARY": "janeiro",
+            "FEBRUARY": "fevereiro",
+            "MARCH": "março",
+            "APRIL": "abril",
+            "MAY": "maio",
+            "JUNE": "junho",
+            "JULY": "julho",
+            "AUGUST": "agosto",
+            "SEPTEMBER": "setembro",
+            "OCTOBER": "outubro",
+            "NOVEMBER": "novembro",
+            "DECEMBER": "dezembro",
+        }
+        ref_month_display = f"{pt_months.get(month_name, month_name.lower())}.{referred_year}".upper()
+        
+        month_idx = payment_date.month
+        month_names_pt = [
+            "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+        ]
+        pt_payment_month = month_names_pt[month_idx - 1]
+        location_date_line = f"{location.upper()}, {payment_date.day} de {pt_payment_month} de {payment_date.year}"
+    else:
+        ref_month_display = f"{month_name.capitalize()} {referred_year}"
+        
+        month_names_en = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ]
+        en_payment_month = month_names_en[payment_date.month - 1]
+        location_date_line = f"{location.upper()}, {payment_date.day} of {en_payment_month} of {payment_date.year}"
+        
+    formatted_body_text = body_text.replace("{ref_month}", ref_month_display)
+    ensure_signature_image()
+    template = Template(RECEIPT_HTML_TEMPLATE)
+    sig_path = str(Path("signature.png").resolve().as_uri())
+    return template.render(
+        body_text=formatted_body_text,
+        location_date_line=location_date_line,
+        signer_name=signer_name,
+        signer_address=signer_address,
+        signature_image_url=sig_path
+    )
+
+
 async def process_direct_receipt(request: DirectReceiptRequest) -> DirectReceiptResponse:
     warnings = []
     
@@ -332,11 +541,49 @@ async def process_direct_receipt(request: DirectReceiptRequest) -> DirectReceipt
     
     formatted_message = format_receipt_message(payment_date, referred_month_str, request.pt_br)
     
+    body_txt = request.body_text
+    if body_txt is None:
+        if request.pt_br:
+            body_txt = "Recebi o recibo referente ao pagamento do mês de {ref_month}."
+        else:
+            body_txt = "I received the receipt for the payment of month of {ref_month}."
+
+    db_config = get_db_config()
+    signer_name = request.signer_name or db_config["signer_name"]
+    signer_address = request.signer_address or db_config["signer_address"]
+    location = request.location or db_config["location"]
+
+    html_content = format_receipt_html(
+        payment_date=payment_date,
+        referred_month_str=referred_month_str,
+        signer_name=signer_name,
+        signer_address=signer_address,
+        location=location,
+        pt_br=request.pt_br,
+        body_text=body_txt
+    )
+    
+    try:
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+        
+        safe_referred_month = referred_month_str.replace(".", "_")
+        filename = f"receipt_{payment_date}_{safe_referred_month}.png"
+        image_path = output_dir / filename
+        
+        hti = Html2Image(output_path=str(output_dir))
+        hti.screenshot(html_str=html_content, save_as=filename, size=(1650, 1600))
+        image_path_str = str(image_path.resolve())
+    except Exception as exc:
+        warnings.append(f"Falha ao gerar imagem do recibo: {exc}")
+        image_path_str = None
+        
     return DirectReceiptResponse(
         status="sucesso",
         payment_date=payment_date,
         referred_month=referred_month_str,
         formatted_message=formatted_message,
+        image_path=image_path_str,
         trigger_info={
             "warnings": warnings,
             "original_input": {
@@ -405,4 +652,5 @@ __all__ = [
     "resolve_referred_month_and_year",
     "infer_referred_year",
     "format_receipt_message",
+    "format_receipt_html",
 ]

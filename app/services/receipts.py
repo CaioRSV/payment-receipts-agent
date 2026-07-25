@@ -546,14 +546,16 @@ async def process_direct_receipt(request: DirectReceiptRequest) -> DirectReceipt
     
     formatted_message = format_receipt_message(payment_date, referred_month_str, request.pt_br)
     
+    db_config = get_db_config()
     body_txt = request.body_text
     if body_txt is None:
-        if request.pt_br:
-            body_txt = "Recebi o recibo referente ao pagamento do mês de {ref_month}."
-        else:
-            body_txt = "I received the receipt for the payment of month of {ref_month}."
+        body_txt = db_config.get("default_body")
+        if body_txt is None:
+            if request.pt_br:
+                body_txt = "Recebi o recibo referente ao pagamento do mês de {ref_month}."
+            else:
+                body_txt = "I received the receipt for the payment of month of {ref_month}."
 
-    db_config = get_db_config()
     signer_name = request.signer_name or db_config["signer_name"]
     signer_address = request.signer_address or db_config["signer_address"]
     location = request.location or db_config["location"]

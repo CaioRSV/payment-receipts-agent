@@ -5,8 +5,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./receipts.db:/app/receipts.db
+      - ./data:/app/data
       - ./output:/app/output
+    environment:
+      - DATABASE_PATH=/app/data/receipts.db
     env_file:
       - .env
     restart: unless-stopped

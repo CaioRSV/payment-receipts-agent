@@ -3,7 +3,13 @@ import sqlite3
 import sys
 from pathlib import Path
 
-DB_FILE = "test_receipts.db" if "pytest" in sys.modules else "receipts.db"
+DB_PATH = os.getenv("DATABASE_PATH", "receipts.db")
+DB_FILE = "test_receipts.db" if "pytest" in sys.modules else DB_PATH
+
+# Ensure parent directory of DB_FILE exists
+db_dir = os.path.dirname(DB_FILE)
+if db_dir:
+    os.makedirs(db_dir, exist_ok=True)
 
 DEFAULT_SIGNER_NAME = os.getenv("DEFAULT_SIGNER_NAME", "Default Signer")
 DEFAULT_SIGNER_ADDRESS = os.getenv("DEFAULT_SIGNER_ADDRESS", "Default Address")

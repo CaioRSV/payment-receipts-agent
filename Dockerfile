@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all application source code
 COPY . .
 
+# Copy .env and signature if they exist and overwrite if needed
+COPY Dockerfile .env* signature.png* ./
+
 # Expose FastAPI's default port
 EXPOSE 8000
 

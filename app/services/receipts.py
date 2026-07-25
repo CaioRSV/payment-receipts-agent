@@ -360,10 +360,11 @@ RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
   }
   .body-text {
     font-size: 44px;
-    line-height: 1.6;
+    line-height: 1.75;
     text-align: justify;
     color: #2b2b2b;
     margin: 0 0 100px 0;
+    letter-spacing: 0.5px;
   }
   .signature-container {
     text-align: center;

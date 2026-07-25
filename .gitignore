@@ -145,3 +145,6 @@ venv.bak/
 *.db
 *.db-journal
 
+# Output generated files
+output/
+

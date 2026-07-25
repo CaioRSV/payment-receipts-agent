@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    container_name: payment_receipts_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./receipts.db:/app/receipts.db
+      - ./output:/app/output
+    env_file:
+      - .env
+    restart: unless-stopped

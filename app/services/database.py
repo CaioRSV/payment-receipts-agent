@@ -1,8 +1,9 @@
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
-DB_FILE = "receipts.db"
+DB_FILE = "test_receipts.db" if "pytest" in sys.modules else "receipts.db"
 
 DEFAULT_SIGNER_NAME = os.getenv("DEFAULT_SIGNER_NAME", "Default Signer")
 DEFAULT_SIGNER_ADDRESS = os.getenv("DEFAULT_SIGNER_ADDRESS", "Default Address")
@@ -29,9 +30,9 @@ def init_db():
             """
         )
         # Check if seed config already exists
-        cursor.execute("SELECT COUNT(*) FROM config WHERE id = 1")
-        count = cursor.fetchone()[0]
-        if count == 0:
+        cursor.execute("SELECT signer_name, signer_address, location FROM config WHERE id = 1")
+        row = cursor.fetchone()
+        if not row:
             cursor.execute(
                 """
                 INSERT INTO config (id, signer_name, signer_address, location)
@@ -40,6 +41,21 @@ def init_db():
                 (DEFAULT_SIGNER_NAME, DEFAULT_SIGNER_ADDRESS, DEFAULT_LOCATION)
             )
             conn.commit()
+        else:
+            db_name, db_address, db_location = row
+            updated = False
+            # Check if name is a placeholder or left over from test pollution, and .env has custom values
+            if (db_name in ("Default Signer", "Test Signer Editado", "Test User Name")) and DEFAULT_SIGNER_NAME not in ("Default Signer", "Test Signer Editado", "Test User Name"):
+                cursor.execute("UPDATE config SET signer_name = ? WHERE id = 1", (DEFAULT_SIGNER_NAME,))
+                updated = True
+            if (db_address in ("Default Address", "Av Teste, 100", "Test User Address, 123")) and DEFAULT_SIGNER_ADDRESS not in ("Default Address", "Av Teste, 100", "Test User Address, 123"):
+                cursor.execute("UPDATE config SET signer_address = ? WHERE id = 1", (DEFAULT_SIGNER_ADDRESS,))
+                updated = True
+            if (db_location in ("Default Location", "TEST LOCAL", "TEST LOCATION")) and DEFAULT_LOCATION not in ("Default Location", "TEST LOCAL", "TEST LOCATION"):
+                cursor.execute("UPDATE config SET location = ? WHERE id = 1", (DEFAULT_LOCATION,))
+                updated = True
+            if updated:
+                conn.commit()
     finally:
         conn.close()
 

@@ -304,6 +304,8 @@ RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
   html, body {
     margin: 0;
     padding: 0;
@@ -320,7 +322,8 @@ RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    font-family: 'Segoe UI Black', 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI Black', 'Montserrat', sans-serif;
+    font-weight: 900;
   }
   .thick-bar {
     height: 24px;
@@ -344,6 +347,8 @@ RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
     flex-grow: 1;
   }
   h1 {
+    font-family: 'Segoe UI Black', 'Montserrat', sans-serif;
+    font-weight: 900;
     font-size: 68px;
     color: #000000;
     text-transform: uppercase;
@@ -571,7 +576,10 @@ async def process_direct_receipt(request: DirectReceiptRequest) -> DirectReceipt
         filename = f"receipt_{payment_date}_{safe_referred_month}.png"
         image_path = output_dir / filename
         
-        hti = Html2Image(output_path=str(output_dir))
+        hti = Html2Image(
+            output_path=str(output_dir),
+            custom_flags=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+        )
         hti.screenshot(html_str=html_content, save_as=filename, size=(1650, 1600))
         image_path_str = f"/output/{filename}"
     except Exception as exc:

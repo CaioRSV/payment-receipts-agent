@@ -65,8 +65,10 @@ def test_api_direct_receipt_success():
     data = response.json()
     assert data["status"] == "sucesso"
     assert data["payment_date"] == "2024-02-10"
-    if data["image_path"] and os.path.exists(data["image_path"]):
-        os.remove(data["image_path"])
+    if data["image_path"]:
+        local_path = data["image_path"].lstrip("/")
+        if os.path.exists(local_path):
+            os.remove(local_path)
 
 
 def test_api_update_config_and_fallback():
@@ -94,8 +96,10 @@ def test_api_update_config_and_fallback():
     assert receipt_resp.status_code == 200
     data = receipt_resp.json()
     assert data["status"] == "sucesso"
-    if data["image_path"] and os.path.exists(data["image_path"]):
-        os.remove(data["image_path"])
+    if data["image_path"]:
+        local_path = data["image_path"].lstrip("/")
+        if os.path.exists(local_path):
+            os.remove(local_path)
 
     # Double check database got updated config settings
     db_config = get_db_config()

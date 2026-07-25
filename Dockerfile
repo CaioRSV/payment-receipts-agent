@@ -8,12 +8,8 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
-    libnss3 \
-    libgconf-2-4 \
-    libfontconfig1 \
-    libxrender1 \
-    libxtst6 \
-    libxi6 \
+    ca-certificates \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container

@@ -573,7 +573,7 @@ async def process_direct_receipt(request: DirectReceiptRequest) -> DirectReceipt
         
         hti = Html2Image(output_path=str(output_dir))
         hti.screenshot(html_str=html_content, save_as=filename, size=(1650, 1600))
-        image_path_str = str(image_path.resolve())
+        image_path_str = f"/output/{filename}"
     except Exception as exc:
         warnings.append(f"Falha ao gerar imagem do recibo: {exc}")
         image_path_str = None

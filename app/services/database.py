@@ -1,11 +1,12 @@
+import os
 import sqlite3
 from pathlib import Path
 
 DB_FILE = "receipts.db"
 
-DEFAULT_SIGNER_NAME = "MÁRCIA SANTOS DA SILVA VERÇOSA"
-DEFAULT_SIGNER_ADDRESS = "RUA JOÃO MURILO DE OLIVEIRA, 142, SÃO VICENTE DE PAULO."
-DEFAULT_LOCATION = "VITÓRIA-PE"
+DEFAULT_SIGNER_NAME = os.getenv("DEFAULT_SIGNER_NAME", "Default Signer")
+DEFAULT_SIGNER_ADDRESS = os.getenv("DEFAULT_SIGNER_ADDRESS", "Default Address")
+DEFAULT_LOCATION = os.getenv("DEFAULT_LOCATION", "Default Location")
 
 
 def get_connection():
